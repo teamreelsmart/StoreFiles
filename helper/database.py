@@ -14,6 +14,8 @@ class MongoDB:
             instance.premium_users = instance.db['pros']
             instance.fsub_status = instance.db['fsub_status']  # New collection for fsub status tracking
             instance.request_sub = instance.db['request_sub']  # New collection for join request tracking
+            instance.verify_links = instance.db['verify_links']
+            instance.verify_users = instance.db['verify_users']
             cls._instances[(uri, db_name)] = instance
         return cls._instances[(uri, db_name)]
 
@@ -181,6 +183,52 @@ class MongoDB:
     async def set_shortner_status(self, enabled: bool):
         """Set shortner on/off status"""
         await self.update_shortner_setting('enabled', enabled)
+
+
+    # ✅ VERIFY LINK FUNCTIONS
+
+    async def create_verify_link(self, token: str, user_id: int, payload: str, short_link: str, expires_at: datetime):
+        await self.verify_links.update_one(
+            {"_id": token},
+            {"$set": {
+                "user_id": user_id,
+                "payload": payload,
+                "short_link": short_link,
+                "expires_at": expires_at,
+                "created_at": datetime.now(),
+                "used": False
+            }},
+            upsert=True
+        )
+
+    async def get_verify_link(self, token: str) -> dict:
+        return await self.verify_links.find_one({"_id": token})
+
+    async def mark_verify_link_used(self, token: str):
+        await self.verify_links.update_one({"_id": token}, {"$set": {"used": True, "used_at": datetime.now()}})
+
+    async def remove_verify_link(self, token: str):
+        await self.verify_links.delete_one({"_id": token})
+
+    async def increment_early_verify_violation(self, user_id: int) -> int:
+        await self.verify_users.update_one(
+            {"_id": user_id},
+            {"$inc": {"early_verify_count": 1}, "$set": {"updated_at": datetime.now()}},
+            upsert=True
+        )
+        data = await self.verify_users.find_one({"_id": user_id})
+        return data.get("early_verify_count", 0) if data else 0
+
+    async def reset_early_verify_violation(self, user_id: int):
+        await self.verify_users.update_one(
+            {"_id": user_id},
+            {"$set": {"early_verify_count": 0, "updated_at": datetime.now()}},
+            upsert=True
+        )
+
+    async def get_early_verify_violation(self, user_id: int) -> int:
+        data = await self.verify_users.find_one({"_id": user_id})
+        return data.get("early_verify_count", 0) if data else 0
 
     # ✅ FSUB STATUS COLLECTION FUNCTIONS
 

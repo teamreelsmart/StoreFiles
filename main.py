@@ -36,4 +36,5 @@ async def runner():
         web_app()
     )
 
-asyncio.run(runner())
+if __name__ == "__main__":
+    asyncio.run(runner())

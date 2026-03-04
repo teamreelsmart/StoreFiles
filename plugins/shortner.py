@@ -18,6 +18,7 @@ def get_short(url, client):
 
     # Check if shortner is enabled
     shortner_enabled = getattr(client, 'shortner_enabled', True)
+    verify_cooldown = int(getattr(client, 'verify_cooldown', 30))
     if not shortner_enabled:
         return url  # Return original URL if shortner is disabled
 
@@ -58,6 +59,7 @@ async def shortner_panel(client, query_or_message):
     short_api = getattr(client, 'short_api', SHORT_API)
     tutorial_link = getattr(client, 'tutorial_link', "https://t.me/HowToDownloadSnap/2")
     shortner_enabled = getattr(client, 'shortner_enabled', True)
+    verify_cooldown = int(getattr(client, 'verify_cooldown', 30))
     
     # Check if shortner is working (only if enabled)
     if shortner_enabled:
@@ -78,6 +80,7 @@ async def shortner_panel(client, query_or_message):
 ›› **ꜱʜᴏʀᴛɴᴇʀ ᴜʀʟ:** `{short_url}`
 ›› **ꜱʜᴏʀᴛɴᴇʀ ᴀᴘɪ:** `{short_api}`</blockquote> 
 <blockquote>›› **ᴛᴜᴛᴏʀɪᴀʟ ʟɪɴᴋ:** `{tutorial_link}`
+›› **ᴠᴇʀɪꜰʏ ᴛɪᴍᴇʀ (s):** `{verify_cooldown}`
 ›› **ᴀᴘɪ ꜱᴛᴀᴛᴜꜱ:** {status}</blockquote>
 
 <blockquote>**≡ ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴄᴏɴꜰɪɢᴜʀᴇ ʏᴏᴜʀ ꜱʜᴏʀᴛɴᴇʀ ꜱᴇᴛᴛɪɴɢꜱ!**</blockquote>"""
@@ -85,6 +88,7 @@ async def shortner_panel(client, query_or_message):
     reply_markup = InlineKeyboardMarkup([
         [InlineKeyboardButton(f'• {toggle_text} ꜱʜᴏʀᴛɴᴇʀ •', 'toggle_shortner'), InlineKeyboardButton('• ᴀᴅᴅ ꜱʜᴏʀᴛɴᴇʀ •', 'add_shortner')],
         [InlineKeyboardButton('• ꜱᴇᴛ ᴛᴜᴛᴏʀɪᴀʟ ʟɪɴᴋ •', 'set_tutorial_link')],
+        [InlineKeyboardButton('• ꜱᴇᴛ ᴠᴇʀɪꜰʏ ᴛɪᴍᴇʀ •', 'set_verify_cooldown')],
         [InlineKeyboardButton('• ᴛᴇꜱᴛ ꜱʜᴏʀᴛɴᴇʀ •', 'test_shortner')],
         [InlineKeyboardButton('◂ ʙᴀᴄᴋ ᴛᴏ ꜱᴇᴛᴛɪɴɢꜱ', 'settings')] if hasattr(query_or_message, 'message') else []
     ])
@@ -218,6 +222,42 @@ __ꜱᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴛᴜᴛᴏʀɪᴀʟ ʟɪɴᴋ ɪɴ ᴛʜᴇ ɴ
                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]]))
 
 #===============================================================#
+
+
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^set_verify_cooldown$"))
+async def set_verify_cooldown(client: Client, query: CallbackQuery):
+    if not query.from_user.id in client.admins:
+        return await query.answer('❌ ᴏɴʟʏ ᴀᴅᴍɪɴꜱ ᴄᴀɴ ᴜꜱᴇ ᴛʜɪꜱ!', show_alert=True)
+
+    await query.answer()
+    current = int(getattr(client, 'verify_cooldown', 30))
+    await query.message.edit_text(
+        f"**Send verify cooldown in seconds (5-600).\nCurrent:** `{current}`"
+    )
+
+    try:
+        res = await client.listen(user_id=query.from_user.id, filters=filters.text, timeout=60)
+        value = int(res.text.strip())
+        if value < 5 or value > 600:
+            return await query.message.edit_text(
+                "**❌ Invalid value! Use 5 to 600 seconds.**",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]])
+            )
+
+        client.verify_cooldown = value
+        await client.mongodb.update_shortner_setting('verify_cooldown', value)
+        await query.message.edit_text(
+            f"**✅ Verify cooldown updated to `{value}` seconds.**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]])
+        )
+    except (ValueError, ListenerTimeout):
+        await query.message.edit_text(
+            "**⏰ Timeout or invalid number. Try again.**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]])
+        )
 
 @Client.on_callback_query(filters.regex("^test_shortner$"))
 async def test_shortner(client: Client, query: CallbackQuery):

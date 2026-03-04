@@ -6,15 +6,74 @@ from config import MSG_EFFECT, OWNER_ID
 from plugins.shortner import get_short
 from helper.helper_func import get_messages, force_sub, decode, batch_auto_del_notification
 import asyncio
+import secrets
+from datetime import datetime, timedelta
 
 #===============================================================#
+
+def build_verify_path(client: Client, token: str) -> str:
+    base = getattr(client, 'service_url', '').rstrip('/')
+    return f"{base}/verify/{token}" if base else f"https://t.me/{client.username}?start=verify_{token}"
+
+
+async def issue_verify_link(client: Client, message: Message, payload: str):
+    token = secrets.token_urlsafe(8).replace('-', '').replace('_', '')[:10]
+    deep_link = f"https://t.me/{client.username}?start=verify_{token}"
+    try:
+        short_link = get_short(deep_link, client)
+    except Exception as e:
+        client.LOGGER(__name__, client.name).warning(f"Shortener failed: {e}")
+        return await message.reply("Couldn't generate short link.")
+
+    expires_at = datetime.now() + timedelta(seconds=max(int(getattr(client, 'verify_cooldown', 30)), 1))
+    await client.mongodb.create_verify_link(token, message.from_user.id, payload, short_link, expires_at)
+
+    short_photo = client.messages.get("SHORT_PIC", "")
+    short_caption = client.messages.get("SHORT_MSG", "")
+    tutorial_link = getattr(client, 'tutorial_link', "https://t.me/HowToDownloadSnap/2")
+    service_link = build_verify_path(client, token)
+
+    await client.send_photo(
+        chat_id=message.chat.id,
+        photo=short_photo,
+        caption=f"{short_caption}\n\n⏱ Verify timer: {getattr(client, 'verify_cooldown', 30)}s",
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("• ᴏᴘᴇɴ ʟɪɴᴋ", url=service_link),
+                InlineKeyboardButton("ᴛᴜᴛᴏʀɪᴀʟ •", url=tutorial_link)
+            ],
+            [
+                InlineKeyboardButton(" • ʙᴜʏ ᴘʀᴇᴍɪᴜᴍ •", url="https://t.me/SnapLoverXBot?start=premium")
+            ]
+        ])
+    )
+
+
+async def send_verify_bypass_warning(client: Client, message: Message, attempt_count: int, seconds_left: int):
+    warning_photo = client.messages.get("VERIFY_WARN_PHOTO", client.messages.get("SHORT_PIC", ""))
+    warning_text = client.messages.get(
+        "VERIFY_WARN_MSG",
+        "⚠️ You are trying to bypass verification.\nWait {seconds}s and use the new link.\nAttempt: {attempt}/2"
+    )
+    caption = warning_text.format(attempt=attempt_count, seconds=max(seconds_left, 0))
+
+    if warning_photo:
+        try:
+            return await client.send_photo(
+                chat_id=message.chat.id,
+                photo=warning_photo,
+                caption=caption
+            )
+        except Exception as e:
+            client.LOGGER(__name__, client.name).warning(f"Failed to send verify warning photo: {e}")
+
+    return await message.reply(caption)
 
 @Client.on_message(filters.command('start') & filters.private)
 @force_sub
 async def start_command(client: Client, message: Message):
     user_id = message.from_user.id
 
-    # 1. Add user if not present
     present = await client.mongodb.present_user(user_id)
     if not present:
         try:
@@ -22,7 +81,6 @@ async def start_command(client: Client, message: Message):
         except Exception as e:
             client.LOGGER(__name__, client.name).warning(f"Error adding a user:\n{e}")
 
-    # 2. Check if banned
     is_banned = await client.mongodb.is_banned(user_id)
     if is_banned:
         return await message.reply("**You have been banned from using this bot!**")
@@ -32,48 +90,66 @@ async def start_command(client: Client, message: Message):
         try:
             original_payload = text.split(" ", 1)[1]
             base64_string = original_payload
-
-            is_short_link = False
-            if base64_string.startswith("yu3elk"):
-                base64_string = base64_string[6:-1]
-                is_short_link = True
-
         except IndexError:
             return await message.reply("Invalid command format.")
 
-        # 3. Check premium status
+        verify_token = None
+        is_short_link = False
+
+        if base64_string.startswith("verify_"):
+            verify_token = base64_string.split("verify_", 1)[1]
+            verify_data = await client.mongodb.get_verify_link(verify_token)
+            if not verify_data:
+                return await message.reply("⚠️ Invalid or expired verify link.")
+            if verify_data.get("used"):
+                return await message.reply("⚠️ This link is already used. Generate a new one.")
+            if verify_data.get("user_id") != user_id:
+                return await message.reply("⚠️ This verify link is only for the original user.")
+
+            expires_at = verify_data.get("expires_at")
+            if expires_at and datetime.now() < expires_at:
+                count = await client.mongodb.increment_early_verify_violation(user_id)
+                left = int((expires_at - datetime.now()).total_seconds())
+                await client.mongodb.remove_verify_link(verify_token)
+
+                mention = f"[{message.from_user.first_name}](tg://user?id={user_id})"
+                log_text = (
+                    f"⚠️ Early verify detected\n"
+                    f"User: {mention}\nUser ID: `{user_id}`\n"
+                    f"Attempts: `{count}`\nRemaining: `{max(left, 0)}s`\n"
+                    f"Payload: `{verify_data.get('payload', '')[:64]}`"
+                )
+                log_channel = int(getattr(client, 'verify_log_channel', 0) or 0)
+                if log_channel:
+                    try:
+                        await client.send_message(log_channel, log_text)
+                    except Exception as e:
+                        client.LOGGER(__name__, client.name).warning(f"Failed to send verify log: {e}")
+
+                if count >= 2:
+                    await client.mongodb.ban_user(user_id)
+                    return await message.reply("🚫 You are banned for repeated early verification abuse.")
+
+                await send_verify_bypass_warning(client, message, count, left)
+                await issue_verify_link(client, message, verify_data.get("payload", ""))
+                return
+
+            await client.mongodb.mark_verify_link_used(verify_token)
+            await client.mongodb.reset_early_verify_violation(user_id)
+            base64_string = verify_data.get("payload", "")
+            original_payload = base64_string
+            is_short_link = True
+
+        elif base64_string.startswith("yu3elk"):
+            base64_string = base64_string[6:-1]
+            is_short_link = True
+
         is_user_pro = await client.mongodb.is_pro(user_id)
-        
-        # 4. Check if shortner is enabled
         shortner_enabled = getattr(client, 'shortner_enabled', True)
 
-        # 5. If user is not premium AND shortner is enabled, send short URL and return
         if not is_user_pro and user_id != OWNER_ID and not is_short_link and shortner_enabled:
-            try:
-                short_link = get_short(f"https://t.me/{client.username}?start=yu3elk{base64_string}7", client)
-            except Exception as e:
-                client.LOGGER(__name__, client.name).warning(f"Shortener failed: {e}")
-                return await message.reply("Couldn't generate short link.")
-
-            short_photo = client.messages.get("SHORT_PIC", "")
-            short_caption = client.messages.get("SHORT_MSG", "")
-            tutorial_link = getattr(client, 'tutorial_link', "https://t.me/HowToDownloadSnap/2")
-
-            await client.send_photo(
-                chat_id=message.chat.id,
-                photo=short_photo,
-                caption=short_caption,
-                reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("• ᴏᴘᴇɴ ʟɪɴᴋ", url=short_link),
-                        InlineKeyboardButton("ᴛᴜᴛᴏʀɪᴀʟ •", url=tutorial_link)
-                    ],
-                    [
-                        InlineKeyboardButton(" • ʙᴜʏ ᴘʀᴇᴍɪᴜᴍ •", url="https://t.me/SnapLoverXBot?start=premium")
-                    ]
-                ])
-            )
-            return  # prevent sending actual files
+            await issue_verify_link(client, message, base64_string)
+            return
 
         # 6. Decode and prepare file IDs
         try:
