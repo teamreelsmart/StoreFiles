@@ -1,4 +1,4 @@
-#(©) Codeflix_Bots
+#(©) TuneBots
 
 from aiohttp import web
 from plugins import web_server
@@ -7,7 +7,7 @@ from pyrogram import Client
 from pyrogram.enums import ParseMode
 import sys
 from datetime import datetime
-from config import LOGGER, PORT, OWNER_ID, SHORT_URL, SHORT_API, SHORT_TUT
+from config import LOGGER, PORT, OWNER_ID, SHORT_URL, SHORT_API, SHORT_TUT, VERIFY_COOLDOWN, VERIFY_REDIRECT_DELAY, VERIFY_LOG_CHANNEL, SERVICE_URL
 from helper import MongoDB
 
 version = "v1.0.0"
@@ -45,6 +45,8 @@ class Bot(Client):
     
     async def start(self):
         await super().start()
+        from plugins import route as web_route
+        web_route.BOT_CLIENT = self
         usr_bot_me = await self.get_me()
         self.uptime = datetime.now()
         
@@ -131,6 +133,10 @@ class Bot(Client):
             self.short_api = shortner_settings.get('short_api', SHORT_API)
             self.tutorial_link = shortner_settings.get('tutorial_link', SHORT_TUT)
             self.shortner_enabled = shortner_settings.get('enabled', True)
+            self.verify_cooldown = int(shortner_settings.get('verify_cooldown', VERIFY_COOLDOWN))
+            self.verify_redirect_delay = int(shortner_settings.get('verify_redirect_delay', VERIFY_REDIRECT_DELAY))
+            self.verify_log_channel = int(shortner_settings.get('verify_log_channel', VERIFY_LOG_CHANNEL))
+            self.service_url = shortner_settings.get('service_url', SERVICE_URL)
         except Exception as e:
             self.LOGGER(__name__, self.name).warning(f"Error loading shortner settings: {e}")
             # Set defaults from config if loading fails
@@ -138,6 +144,10 @@ class Bot(Client):
             self.short_api = SHORT_API
             self.tutorial_link = SHORT_TUT
             self.shortner_enabled = True
+            self.verify_cooldown = VERIFY_COOLDOWN
+            self.verify_redirect_delay = VERIFY_REDIRECT_DELAY
+            self.verify_log_channel = VERIFY_LOG_CHANNEL
+            self.service_url = SERVICE_URL
         
         try:
             db_channel = await self.get_chat(self.db)
@@ -173,5 +183,5 @@ async def web_app():
     app = web.AppRunner(await web_server())
     await app.setup()
     bind_address = "0.0.0.0"
-    await web.TCPSite(app, bind_address, PORT).start()
+    await web.TCPSite(app, bind_address, int(PORT)).start()
     

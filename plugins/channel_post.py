@@ -6,8 +6,17 @@ from helper.helper_func import encode
 
 #===============================================================#
 
-@Client.on_message(filters.private & ~filters.command(['start', 'shortner','users','broadcast','batch','genlink','stats', 'pbroadcast', 'db', 'adddb', 'add_db', 'removedb', 'rm_db',  'ban', 'unban', 'addpremium', 'delpremium', 'premiumusers', 'request', 'profile']))
+@Client.on_message(filters.private & filters.incoming & ~filters.service & ~filters.command(['start', 'shortner','users','broadcast','batch','genlink','stats','usage', 'pbroadcast', 'db', 'adddb', 'add_db', 'removedb', 'rm_db',  'ban', 'unban', 'addpremium', 'delpremium', 'premiumusers', 'request', 'profile', 'refer', 'mini']))
 async def channel_post(client: Client, message: Message):
+
+    # Avoid intercepting commands not listed above (e.g. /help, /settings, /anything@bot)
+    if message.text and message.text.strip().startswith('/'):
+        return
+
+    # Ignore updates that are not user-generated content
+    if not message.from_user:
+        return
+
     if message.from_user.id not in client.admins:
         return await message.reply(client.reply_text)
     reply_text = await message.reply_text("Please Wait...!", quote = True)
@@ -24,6 +33,7 @@ async def channel_post(client: Client, message: Message):
     string = f"get-{converted_id}"
     base64_string = await encode(string)
     link = f"https://t.me/{client.username}?start={base64_string}"
+    await client.mongodb.increment_links_generated(message.from_user.id)
 
     reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔁 Share URL", url=f'https://telegram.me/share/url?url={link}')]])
 

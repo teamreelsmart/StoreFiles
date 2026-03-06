@@ -14,6 +14,8 @@ class MongoDB:
             instance.premium_users = instance.db['pros']
             instance.fsub_status = instance.db['fsub_status']  # New collection for fsub status tracking
             instance.request_sub = instance.db['request_sub']  # New collection for join request tracking
+            instance.verify_links = instance.db['verify_links']
+            instance.verify_users = instance.db['verify_users']
             cls._instances[(uri, db_name)] = instance
         return cls._instances[(uri, db_name)]
 
@@ -106,7 +108,7 @@ class MongoDB:
         return bool(found)
 
     async def add_user(self, user_id: int, ban: bool = False):
-        await self.user_data.insert_one({'_id': user_id, 'ban': ban})
+        await self.user_data.insert_one({'_id': user_id, 'ban': ban, 'created_at': datetime.now(), 'links_generated': 0, 'referral_success_count': 0})
 
     async def full_userbase(self) -> list[int]:
         cursor = self.user_data.find()
@@ -124,6 +126,57 @@ class MongoDB:
     async def is_banned(self, user_id: int) -> bool:
         user = await self.user_data.find_one({'_id': user_id})
         return user.get('ban', False) if user else False
+
+
+    async def set_referrer(self, user_id: int, referrer_id: int):
+        await self.user_data.update_one(
+            {'_id': user_id},
+            {'$set': {'referrer_id': referrer_id}},
+            upsert=True
+        )
+
+    async def get_referrer(self, user_id: int):
+        user = await self.user_data.find_one({'_id': user_id})
+        return user.get('referrer_id') if user else None
+
+    async def is_referral_rewarded(self, user_id: int) -> bool:
+        user = await self.user_data.find_one({'_id': user_id})
+        return user.get('referral_rewarded', False) if user else False
+
+    async def mark_referral_rewarded(self, user_id: int):
+        await self.user_data.update_one(
+            {'_id': user_id},
+            {'$set': {'referral_rewarded': True}},
+            upsert=True
+        )
+
+    async def add_referral_success(self, referrer_id: int):
+        await self.user_data.update_one(
+            {'_id': referrer_id},
+            {'$inc': {'referral_success_count': 1}},
+            upsert=True
+        )
+
+    async def get_referral_success(self, referrer_id: int) -> int:
+        user = await self.user_data.find_one({'_id': referrer_id})
+        return user.get('referral_success_count', 0) if user else 0
+
+
+
+    async def increment_links_generated(self, user_id: int):
+        await self.user_data.update_one(
+            {'_id': user_id},
+            {'$inc': {'links_generated': 1}},
+            upsert=True
+        )
+
+    async def get_links_generated(self, user_id: int) -> int:
+        user = await self.user_data.find_one({'_id': user_id})
+        return user.get('links_generated', 0) if user else 0
+
+    async def get_user_created_at(self, user_id: int):
+        user = await self.user_data.find_one({'_id': user_id})
+        return user.get('created_at') if user else None
 
     # ✅ FSUB CHANNELS FUNCTIONS
 
@@ -181,6 +234,52 @@ class MongoDB:
     async def set_shortner_status(self, enabled: bool):
         """Set shortner on/off status"""
         await self.update_shortner_setting('enabled', enabled)
+
+
+    # ✅ VERIFY LINK FUNCTIONS
+
+    async def create_verify_link(self, token: str, user_id: int, payload: str, short_link: str, expires_at: datetime):
+        await self.verify_links.update_one(
+            {"_id": token},
+            {"$set": {
+                "user_id": user_id,
+                "payload": payload,
+                "short_link": short_link,
+                "expires_at": expires_at,
+                "created_at": datetime.now(),
+                "used": False
+            }},
+            upsert=True
+        )
+
+    async def get_verify_link(self, token: str) -> dict:
+        return await self.verify_links.find_one({"_id": token})
+
+    async def mark_verify_link_used(self, token: str):
+        await self.verify_links.update_one({"_id": token}, {"$set": {"used": True, "used_at": datetime.now()}})
+
+    async def remove_verify_link(self, token: str):
+        await self.verify_links.delete_one({"_id": token})
+
+    async def increment_early_verify_violation(self, user_id: int) -> int:
+        await self.verify_users.update_one(
+            {"_id": user_id},
+            {"$inc": {"early_verify_count": 1}, "$set": {"updated_at": datetime.now()}},
+            upsert=True
+        )
+        data = await self.verify_users.find_one({"_id": user_id})
+        return data.get("early_verify_count", 0) if data else 0
+
+    async def reset_early_verify_violation(self, user_id: int):
+        await self.verify_users.update_one(
+            {"_id": user_id},
+            {"$set": {"early_verify_count": 0, "updated_at": datetime.now()}},
+            upsert=True
+        )
+
+    async def get_early_verify_violation(self, user_id: int) -> int:
+        data = await self.verify_users.find_one({"_id": user_id})
+        return data.get("early_verify_count", 0) if data else 0
 
     # ✅ FSUB STATUS COLLECTION FUNCTIONS
 
