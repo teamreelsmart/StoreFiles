@@ -4,7 +4,6 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 import humanize
 from config import MSG_EFFECT, OWNER_ID
 from plugins.shortner import get_short
-from plugins.refer import handle_referral_payload
 from helper.helper_func import get_messages, force_sub, decode, batch_auto_del_notification
 import asyncio
 import secrets
@@ -69,6 +68,94 @@ async def send_verify_bypass_warning(client: Client, message: Message, attempt_c
             client.LOGGER(__name__, client.name).warning(f"Failed to send verify warning photo: {e}")
 
     return await message.reply(caption)
+
+
+
+async def _debug_referral_issue(client: Client, where: str, error: Exception, user_id: int | None = None):
+    log_channel = int(getattr(client, 'verify_log_channel', 0) or 0)
+    if not log_channel:
+        return
+    msg = f"⚠️ Referral Debug\nWhere: `{where}`\nError: `{str(error)[:1500]}`"
+    if user_id is not None:
+        msg += f"\nUser: `{user_id}`"
+    try:
+        await client.send_message(log_channel, msg)
+    except Exception:
+        pass
+
+
+async def _grant_referral_day(client: Client, user_id: int):
+    now = datetime.now()
+    if await client.mongodb.is_pro(user_id):
+        current_expiry = await client.mongodb.get_expiry_date(user_id)
+        if current_expiry is None:
+            return
+    else:
+        current_expiry = None
+
+    base = current_expiry if current_expiry and current_expiry > now else now
+    await client.mongodb.add_pro(user_id, base + timedelta(days=1))
+
+
+async def handle_referral_payload(client: Client, message: Message, payload: str) -> bool:
+    if not payload.startswith("refer_"):
+        return False
+
+    user_id = message.from_user.id
+    try:
+        referrer_id = int(payload.split("refer_", 1)[1])
+
+        if referrer_id == user_id:
+            await message.reply("⚠️ You cannot refer yourself.")
+            return True
+
+        if not await client.mongodb.present_user(referrer_id):
+            await message.reply("⚠️ Referrer not found.")
+            return True
+
+        existing_referrer = await client.mongodb.get_referrer(user_id)
+        if existing_referrer:
+            await message.reply("⚠️ Referral already claimed for your account.")
+            return True
+
+        await client.mongodb.set_referrer(user_id, referrer_id)
+
+        if not await client.mongodb.is_referral_rewarded(user_id):
+            await _grant_referral_day(client, user_id)
+            await _grant_referral_day(client, referrer_id)
+            await client.mongodb.mark_referral_rewarded(user_id)
+            await client.mongodb.add_referral_success(referrer_id)
+
+            try:
+                await client.send_message(referrer_id, f"🎉 You referred a new user: {message.from_user.mention}. Both got 1 day premium!")
+            except Exception as e:
+                await _debug_referral_issue(client, "start.handle_referral_payload.notify_referrer", e, referrer_id)
+
+            try:
+                await client.send_message(user_id, f"🎉 You were referred by [user](tg://user?id={referrer_id}). You got 1 day premium!")
+            except Exception as e:
+                await _debug_referral_issue(client, "start.handle_referral_payload.notify_referred", e, user_id)
+
+            owner_msg = f"✅ Referral Success\nReferrer: [user](tg://user?id={referrer_id})\nReferred: {message.from_user.mention}\nReward: 1 day premium both"
+            try:
+                await client.send_message(OWNER_ID, owner_msg)
+            except Exception as e:
+                await _debug_referral_issue(client, "start.handle_referral_payload.notify_owner", e, OWNER_ID)
+
+            log_channel = int(getattr(client, 'verify_log_channel', 0) or 0)
+            if log_channel:
+                try:
+                    await client.send_message(log_channel, owner_msg)
+                except Exception as e:
+                    await _debug_referral_issue(client, "start.handle_referral_payload.notify_log", e, log_channel)
+
+        return True
+
+    except Exception as e:
+        await _debug_referral_issue(client, "start.handle_referral_payload.main", e, user_id)
+        await message.reply("⚠️ Referral processing error. Please try again.")
+        return True
+
 
 
 
