@@ -4,6 +4,7 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 import humanize
 from config import MSG_EFFECT, OWNER_ID
 from plugins.shortner import get_short
+from plugins.refer import handle_referral_payload
 from helper.helper_func import get_messages, force_sub, decode, batch_auto_del_notification
 import asyncio
 import secrets
@@ -107,42 +108,6 @@ async def send_start_home(client: Client, message: Message):
         )
 
 
-async def grant_referral_day(client: Client, user_id: int):
-    now = datetime.now()
-    # Permanent premium users should remain permanent
-    if await client.mongodb.is_pro(user_id):
-        current_expiry = await client.mongodb.get_expiry_date(user_id)
-        if current_expiry is None:
-            return
-    else:
-        current_expiry = None
-
-    base = current_expiry if current_expiry and current_expiry > now else now
-    await client.mongodb.add_pro(user_id, base + timedelta(days=1))
-
-
-async def send_refer_panel(client: Client, message: Message):
-    invite_link = f"https://t.me/{client.username}?start=refer_{message.from_user.id}"
-    photo = client.messages.get("REFER_PHOTO", client.messages.get("START_PHOTO", ""))
-    caption = client.messages.get(
-        "REFER_MSG",
-        "<b>🎁 Refer & Earn!\nInvite your friends and both of you get 1 day premium after successful join.</b>\n\n🔗 {invite_link}"
-    ).format(invite_link=invite_link)
-
-    share_text = "Hey brother i just found a Amezing network for viral videos and other stuff here link join fast you get  day premium as joining bonu"
-    share_url = f"https://t.me/share/url?url={invite_link}&text={share_text}"
-    markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📨 Share Invite", url=share_url)],
-        [InlineKeyboardButton("🔗 Invite Link", url=invite_link)]
-    ])
-
-    if photo:
-        try:
-            return await client.send_photo(message.chat.id, photo=photo, caption=caption, reply_markup=markup)
-        except Exception:
-            pass
-    return await message.reply(caption, reply_markup=markup)
-
 @Client.on_message(filters.command('start') & filters.private)
 @force_sub
 async def start_command(client: Client, message: Message):
@@ -170,53 +135,7 @@ async def start_command(client: Client, message: Message):
         verify_token = None
         is_short_link = False
 
-        if base64_string.startswith("refer_"):
-            try:
-                referrer_id = int(base64_string.split("refer_", 1)[1])
-            except Exception:
-                return await message.reply("⚠️ Invalid referral link.")
-
-            if referrer_id == user_id:
-                return await message.reply("⚠️ You cannot refer yourself.")
-
-            if not await client.mongodb.present_user(referrer_id):
-                return await message.reply("⚠️ Referrer not found.")
-
-            existing_referrer = await client.mongodb.get_referrer(user_id)
-            if existing_referrer:
-                return await message.reply("⚠️ Referral already claimed for your account.")
-
-            await client.mongodb.set_referrer(user_id, referrer_id)
-
-            if not await client.mongodb.is_referral_rewarded(user_id):
-                await grant_referral_day(client, user_id)
-                await grant_referral_day(client, referrer_id)
-                await client.mongodb.mark_referral_rewarded(user_id)
-                await client.mongodb.add_referral_success(referrer_id)
-
-                try:
-                    await client.send_message(referrer_id, f"🎉 You referred a new user: {message.from_user.mention}. Both got 1 day premium!")
-                except Exception:
-                    pass
-
-                try:
-                    await client.send_message(user_id, f"🎉 You were referred by [user](tg://user?id={referrer_id}). You got 1 day premium!")
-                except Exception:
-                    pass
-
-                owner_msg = f"✅ Referral Success\nReferrer: [user](tg://user?id={referrer_id})\nReferred: {message.from_user.mention}\nReward: 1 day premium both"
-                try:
-                    await client.send_message(OWNER_ID, owner_msg)
-                except Exception:
-                    pass
-
-                log_channel = int(getattr(client, 'verify_log_channel', 0) or 0)
-                if log_channel:
-                    try:
-                        await client.send_message(log_channel, owner_msg)
-                    except Exception:
-                        pass
-
+        if await handle_referral_payload(client, message, base64_string):
             await send_start_home(client, message)
             return
 
@@ -488,27 +407,6 @@ async def start_command(client: Client, message: Message):
 
 
 #===============================================================#
-
-@Client.on_message(filters.command('refer') & filters.private)
-async def refer_command(client: Client, message: Message):
-    await send_refer_panel(client, message)
-
-
-@Client.on_callback_query(filters.regex('^refer_earn$'))
-async def refer_callback(client: Client, query):
-    if not query.from_user:
-        return
-
-    dummy = query.message
-    # Reuse sender with callback message context
-    class _Msg:
-        from_user = query.from_user
-        chat = query.message.chat
-        reply = query.message.reply
-    await query.answer()
-    await send_refer_panel(client, _Msg())
-
-
 
 @Client.on_message(filters.command('mini') & filters.private)
 @force_sub
