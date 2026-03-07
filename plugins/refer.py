@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import re
+from urllib.parse import quote
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import OWNER_ID
@@ -43,8 +44,12 @@ async def build_refer_panel(client: Client, user):
         "<b>🎁 Refer & Earn!\nInvite your friends and both of you get 1 day premium after successful join.</b>\n\n🔗 {invite_link}"
     ).format(invite_link=invite_link)
 
-    share_text = "Hey brother i just found a Amezing network for viral videos and other stuff here link join fast you get  day premium as joining bonu"
-    share_url = f"https://t.me/share/url?url={invite_link}&text={share_text}"
+    share_text = "Check this awesome file"
+    share_url = (
+        "https://t.me/share/url"
+        f"?url={quote(invite_link, safe='')}"
+        f"&text={quote(share_text, safe='')}"
+    )
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("📨 Share Invite", url=share_url)],
         [InlineKeyboardButton("🔗 Invite Link", url=invite_link)]
