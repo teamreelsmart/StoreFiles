@@ -19,24 +19,31 @@ def build_verify_path(client: Client, token: str) -> str:
 async def issue_verify_link(client: Client, message: Message, payload: str):
     token = secrets.token_urlsafe(8).replace('-', '').replace('_', '')[:10]
     deep_link = f"https://t.me/{client.username}?start=verify_{token}"
+    provider = await client.mongodb.get_next_shortner_provider(message.from_user.id)
     try:
-        short_link = get_short(deep_link, client)
+        short_link = get_short(deep_link, client, provider=provider)
     except Exception as e:
         client.LOGGER(__name__, client.name).warning(f"Shortener failed: {e}")
         return await message.reply("Couldn't generate short link.")
 
     expires_at = datetime.now() + timedelta(seconds=max(int(getattr(client, 'verify_cooldown', 30)), 1))
-    await client.mongodb.create_verify_link(token, message.from_user.id, payload, short_link, expires_at)
+    await client.mongodb.create_verify_link(token, message.from_user.id, payload, short_link, expires_at, provider)
 
     short_photo = client.messages.get("SHORT_PIC", "")
     short_caption = client.messages.get("SHORT_MSG", "")
     tutorial_link = getattr(client, 'tutorial_link', "https://t.me/HowToDownloadSnap/2")
     service_link = build_verify_path(client, token)
 
+    access_hours = int(getattr(client, 'verify_access_hours', 4) or 4)
+
     await client.send_photo(
         chat_id=message.chat.id,
         photo=short_photo,
-        caption=f"{short_caption}\n\n⏱ Verify timer: {getattr(client, 'verify_cooldown', 30)}s",
+        caption=(
+            f"{short_caption}\n\n"
+            f"⏱ Verify timer: {getattr(client, 'verify_cooldown', 30)}s\n"
+            f"✅ One-time verification unlocks {access_hours} hour(s) access"
+        ),
         reply_markup=InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("• ᴏᴘᴇɴ ʟɪɴᴋ", url=service_link),
@@ -295,6 +302,9 @@ async def start_command(client: Client, message: Message):
 
             await client.mongodb.mark_verify_link_used(verify_token)
             await client.mongodb.reset_early_verify_violation(user_id)
+            await client.mongodb.set_last_shortner_provider(user_id, verify_data.get("provider", "primary"))
+            verify_access_hours = int(getattr(client, 'verify_access_hours', 4) or 4)
+            await client.mongodb.set_verify_pass(user_id, verify_access_hours)
             base64_string = verify_data.get("payload", "")
             original_payload = base64_string
             is_short_link = True
@@ -304,9 +314,10 @@ async def start_command(client: Client, message: Message):
             is_short_link = True
 
         is_user_pro = await client.mongodb.is_pro(user_id)
+        has_verify_pass = await client.mongodb.has_active_verify_pass(user_id)
         shortner_enabled = getattr(client, 'shortner_enabled', True)
 
-        if not is_user_pro and user_id != OWNER_ID and not is_short_link and shortner_enabled:
+        if not is_user_pro and user_id != OWNER_ID and not is_short_link and shortner_enabled and not has_verify_pass:
             await issue_verify_link(client, message, base64_string)
             return
 
