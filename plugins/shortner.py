@@ -19,6 +19,7 @@ def get_short(url, client):
     # Check if shortner is enabled
     shortner_enabled = getattr(client, 'shortner_enabled', True)
     verify_cooldown = int(getattr(client, 'verify_cooldown', 30))
+    verify_access_hours = int(getattr(client, 'verify_access_hours', 4))
     if not shortner_enabled:
         return url  # Return original URL if shortner is disabled
 
@@ -60,6 +61,7 @@ async def shortner_panel(client, query_or_message):
     tutorial_link = getattr(client, 'tutorial_link', "https://t.me/HowToDownloadSnap/2")
     shortner_enabled = getattr(client, 'shortner_enabled', True)
     verify_cooldown = int(getattr(client, 'verify_cooldown', 30))
+    verify_access_hours = int(getattr(client, 'verify_access_hours', 4))
     
     # Check if shortner is working (only if enabled)
     if shortner_enabled:
@@ -81,6 +83,7 @@ async def shortner_panel(client, query_or_message):
 ›› **ꜱʜᴏʀᴛɴᴇʀ ᴀᴘɪ:** `{short_api}`</blockquote> 
 <blockquote>›› **ᴛᴜᴛᴏʀɪᴀʟ ʟɪɴᴋ:** `{tutorial_link}`
 ›› **ᴠᴇʀɪꜰʏ ᴛɪᴍᴇʀ (s):** `{verify_cooldown}`
+›› **ᴠᴇʀɪꜰʏ ᴀᴄᴄᴇss (h):** `{verify_access_hours}`
 ›› **ᴀᴘɪ ꜱᴛᴀᴛᴜꜱ:** {status}</blockquote>
 
 <blockquote>**≡ ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴄᴏɴꜰɪɢᴜʀᴇ ʏᴏᴜʀ ꜱʜᴏʀᴛɴᴇʀ ꜱᴇᴛᴛɪɴɢꜱ!**</blockquote>"""
@@ -89,6 +92,7 @@ async def shortner_panel(client, query_or_message):
         [InlineKeyboardButton(f'• {toggle_text} ꜱʜᴏʀᴛɴᴇʀ •', 'toggle_shortner'), InlineKeyboardButton('• ᴀᴅᴅ ꜱʜᴏʀᴛɴᴇʀ •', 'add_shortner')],
         [InlineKeyboardButton('• ꜱᴇᴛ ᴛᴜᴛᴏʀɪᴀʟ ʟɪɴᴋ •', 'set_tutorial_link')],
         [InlineKeyboardButton('• ꜱᴇᴛ ᴠᴇʀɪꜰʏ ᴛɪᴍᴇʀ •', 'set_verify_cooldown')],
+        [InlineKeyboardButton('• ꜱᴇᴛ ᴠᴇʀɪꜰʏ ᴀᴄᴄᴇꜱꜱ ᴛɪᴍᴇ •', 'set_verify_access_hours')],
         [InlineKeyboardButton('• ᴛᴇꜱᴛ ꜱʜᴏʀᴛɴᴇʀ •', 'test_shortner')],
         [InlineKeyboardButton('◂ ʙᴀᴄᴋ ᴛᴏ ꜱᴇᴛᴛɪɴɢꜱ', 'settings')] if hasattr(query_or_message, 'message') else []
     ])
@@ -259,6 +263,38 @@ async def set_verify_cooldown(client: Client, query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]])
         )
 
+
+@Client.on_callback_query(filters.regex("^set_verify_access_hours$"))
+async def set_verify_access_hours(client: Client, query: CallbackQuery):
+    if not query.from_user.id in client.admins:
+        return await query.answer('❌ ᴏɴʟʏ ᴀᴅᴍɪɴꜱ ᴄᴀɴ ᴜꜱᴇ ᴛʜɪꜱ!', show_alert=True)
+
+    await query.answer()
+    current = int(getattr(client, 'verify_access_hours', 4))
+    await query.message.edit_text(
+        f"**Select verification access duration.\nCurrent:** `{current}h`",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton('4h', 'verify_access_4'), InlineKeyboardButton('8h', 'verify_access_8')],
+            [InlineKeyboardButton('12h', 'verify_access_12'), InlineKeyboardButton('24h', 'verify_access_24')],
+            [InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]
+        ])
+    )
+
+
+@Client.on_callback_query(filters.regex(r"^verify_access_(4|8|12|24)$"))
+async def save_verify_access_hours(client: Client, query: CallbackQuery):
+    if not query.from_user.id in client.admins:
+        return await query.answer('❌ ᴏɴʟʏ ᴀᴅᴍɪɴꜱ ᴄᴀɴ ᴜꜱᴇ ᴛʜɪꜱ!', show_alert=True)
+
+    hours = int(query.data.rsplit('_', 1)[1])
+    client.verify_access_hours = hours
+    await client.mongodb.update_shortner_setting('verify_access_hours', hours)
+    await query.answer(f"Saved {hours}h", show_alert=False)
+    await query.message.edit_text(
+        f"**✅ Verification access time set to `{hours}h`.**",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]])
+    )
+
 @Client.on_callback_query(filters.regex("^test_shortner$"))
 async def test_shortner(client: Client, query: CallbackQuery):
     if not query.from_user.id in client.admins:
@@ -296,6 +332,4 @@ async def test_shortner(client: Client, query: CallbackQuery):
         msg = f"**❌ ꜱʜᴏʀᴛɴᴇʀ ᴛᴇꜱᴛ ꜰᴀɪʟᴇᴅ!**\n\n**ᴇʀʀᴏʀ:** `{str(e)}`"
     
     await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]]))
-
-
 

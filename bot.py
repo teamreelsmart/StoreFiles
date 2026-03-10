@@ -7,7 +7,7 @@ from pyrogram import Client
 from pyrogram.enums import ParseMode
 import sys
 from datetime import datetime
-from config import LOGGER, PORT, OWNER_ID, SHORT_URL, SHORT_API, SHORT_TUT, VERIFY_COOLDOWN, VERIFY_REDIRECT_DELAY, VERIFY_LOG_CHANNEL, SERVICE_URL
+from config import LOGGER, PORT, OWNER_ID, SHORT_URL, SHORT_API, SHORT_TUT, VERIFY_COOLDOWN, VERIFY_REDIRECT_DELAY, VERIFY_LOG_CHANNEL, VERIFY_ACCESS_HOURS, SERVICE_URL
 from helper import MongoDB
 
 version = "v1.0.0"
@@ -134,6 +134,7 @@ class Bot(Client):
             self.tutorial_link = shortner_settings.get('tutorial_link', SHORT_TUT)
             self.shortner_enabled = shortner_settings.get('enabled', True)
             self.verify_cooldown = int(shortner_settings.get('verify_cooldown', VERIFY_COOLDOWN))
+            self.verify_access_hours = int(shortner_settings.get('verify_access_hours', VERIFY_ACCESS_HOURS))
             self.verify_redirect_delay = int(shortner_settings.get('verify_redirect_delay', VERIFY_REDIRECT_DELAY))
             self.verify_log_channel = int(shortner_settings.get('verify_log_channel', VERIFY_LOG_CHANNEL))
             self.service_url = shortner_settings.get('service_url', SERVICE_URL)
@@ -145,6 +146,7 @@ class Bot(Client):
             self.tutorial_link = SHORT_TUT
             self.shortner_enabled = True
             self.verify_cooldown = VERIFY_COOLDOWN
+            self.verify_access_hours = VERIFY_ACCESS_HOURS
             self.verify_redirect_delay = VERIFY_REDIRECT_DELAY
             self.verify_log_channel = VERIFY_LOG_CHANNEL
             self.service_url = SERVICE_URL

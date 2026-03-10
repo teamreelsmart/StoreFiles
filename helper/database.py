@@ -16,6 +16,7 @@ class MongoDB:
             instance.request_sub = instance.db['request_sub']  # New collection for join request tracking
             instance.verify_links = instance.db['verify_links']
             instance.verify_users = instance.db['verify_users']
+            instance.verify_passes = instance.db['verify_passes']
             cls._instances[(uri, db_name)] = instance
         return cls._instances[(uri, db_name)]
 
@@ -280,6 +281,35 @@ class MongoDB:
     async def get_early_verify_violation(self, user_id: int) -> int:
         data = await self.verify_users.find_one({"_id": user_id})
         return data.get("early_verify_count", 0) if data else 0
+
+    async def set_verify_pass(self, user_id: int, duration_hours: int):
+        now = datetime.now()
+        safe_hours = max(int(duration_hours), 1)
+        valid_until = now + timedelta(hours=safe_hours)
+        await self.verify_passes.update_one(
+            {"_id": user_id},
+            {
+                "$set": {
+                    "valid_until": valid_until,
+                    "duration_hours": safe_hours,
+                    "updated_at": now
+                },
+                "$setOnInsert": {
+                    "created_at": now
+                }
+            },
+            upsert=True
+        )
+        return valid_until
+
+    async def get_verify_pass(self, user_id: int) -> dict:
+        return await self.verify_passes.find_one({"_id": user_id})
+
+    async def has_active_verify_pass(self, user_id: int) -> bool:
+        data = await self.get_verify_pass(user_id)
+        if not data:
+            return False
+        return data.get("valid_until") and data["valid_until"] > datetime.now()
 
     # ✅ FSUB STATUS COLLECTION FUNCTIONS
 

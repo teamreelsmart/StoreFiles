@@ -27,6 +27,7 @@ async def settings(client, query):
 ›› **ʀᴇᴘʟʏ ᴛᴇxᴛ:** `{client.reply_text if client.reply_text else 'ɴᴏɴᴇ'}`
 ›› **ᴀᴅᴍɪɴs:** `{len(client.admins)}`
 ›› **sʜᴏʀᴛɴᴇʀ ᴜʀʟ:** `{getattr(client, 'short_url', 'ɴᴏᴛ sᴇᴛ')}`
+›› **ᴠᴇʀɪꜰʏ ᴀᴄᴄᴇꜱꜱ ʜᴏᴜʀs:** `{getattr(client, 'verify_access_hours', 4)}`
 ›› **ᴛᴜᴛᴏʀɪᴀʟ ʟɪɴᴋ:** `{getattr(client, 'tutorial_link', 'ɴᴏᴛ sᴇᴛ')}`
 ›› **sᴛᴀʀᴛ ᴍᴇssᴀɢᴇ:**
 <pre>{client.messages.get('START', 'ᴇᴍᴘᴛʏ')}</pre>
@@ -69,6 +70,7 @@ async def settings_page_2(client, query):
 ›› **ʀᴇᴘʟʏ ᴛᴇxᴛ:** `{client.reply_text if client.reply_text else 'ɴᴏɴᴇ'}`
 ›› **ᴀᴅᴍɪɴs:** `{len(client.admins)}`
 ›› **sʜᴏʀᴛɴᴇʀ ᴜʀʟ:** `{getattr(client, 'short_url', 'ɴᴏᴛ sᴇᴛ')}`
+›› **ᴠᴇʀɪꜰʏ ᴀᴄᴄᴇꜱꜱ ʜᴏᴜʀs:** `{getattr(client, 'verify_access_hours', 4)}`
 ›› **ᴛᴜᴛᴏʀɪᴀʟ ʟɪɴᴋ:** `{getattr(client, 'tutorial_link', 'ɴᴏᴛ sᴇᴛ')}`
 ›› **sᴛᴀʀᴛ ᴍᴇssᴀɢᴇ:**
 <pre>{client.messages.get('START', 'ᴇᴍᴘᴛʏ')}</pre>
