@@ -3,6 +3,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors.pyromod import ListenerTimeout
 from config import OWNER_ID
 import humanize
+import secrets
 
 #===============================================================#
 
@@ -83,10 +84,60 @@ async def settings_page_2(client, query):
     reply_markup = InlineKeyboardMarkup([
         [InlineKeyboardButton('ᴘʀᴏᴛᴇᴄᴛ ᴄᴏɴᴛᴇɴᴛ', 'protect'), InlineKeyboardButton('ᴘʜᴏᴛᴏs', 'photos')],
         [InlineKeyboardButton('ᴛᴇxᴛs', 'texts'), InlineKeyboardButton('sʜᴏʀᴛɴᴇʀ', 'shortner')],
+        [InlineKeyboardButton('ɢᴇɴ ᴄʜᴀɴɴᴇʟ ʟɪɴᴋ', 'gen_channel_link')],
         [InlineKeyboardButton('‹ ᴘʀᴇᴠ', 'settings'), InlineKeyboardButton('ʜᴏᴍᴇ', 'home')]
     ])
     await query.message.edit_text(msg, reply_markup=reply_markup)
     return
+
+
+#===============================================================#
+
+@Client.on_callback_query(filters.regex("^gen_channel_link$"))
+async def gen_channel_link(client, query):
+    if not query.from_user.id in client.admins:
+        return await query.answer('✗ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!', show_alert=True)
+
+    await query.answer()
+    await query.message.edit_text(
+        "**Forward one message from target channel in next 60 sec.\nMake sure bot is admin in that channel.**"
+    )
+
+    try:
+        res = await client.listen(user_id=query.from_user.id, filters=filters.forwarded, timeout=60)
+    except ListenerTimeout:
+        return await query.message.edit_text(
+            "**⏰ Timeout! Try again.**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'settings_page_2')]])
+        )
+
+    channel_chat = getattr(res, 'forward_from_chat', None)
+    if not channel_chat:
+        return await query.message.edit_text(
+            "**❌ Invalid forward! Please forward a channel message (with forward tag).**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'settings_page_2')]])
+        )
+
+    channel_id = channel_chat.id
+
+    try:
+        me = await client.get_chat_member(channel_id, 'me')
+        if str(getattr(me, 'status', '')).lower() not in ['chatmemberstatus.OWNER'.lower(), 'chatmemberstatus.ADMINISTRATOR'.lower(), 'owner', 'administrator', 'creator']:
+            raise ValueError('bot is not admin')
+    except Exception:
+        return await query.message.edit_text(
+            "**❌ Bot must be admin in target channel.**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'settings_page_2')]])
+        )
+
+    token = secrets.token_urlsafe(6).replace('-', '').replace('_', '')[:8]
+    link = f"https://t.me/{client.username}?start=channel_{channel_id}_{token}"
+    await client.mongodb.increment_links_generated(query.from_user.id)
+
+    await query.message.edit_text(
+        f"**✅ Channel link generated!**\n\n**Channel:** `{channel_chat.title or 'Unknown'}`\n**ID:** `{channel_id}`\n\n`{link}`",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔁 Share URL", url=f'https://telegram.me/share/url?url={link}')], [InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'settings_page_2')]])
+    )
 
 #===============================================================#
 

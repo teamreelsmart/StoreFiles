@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-<a href="https://github.com/codeflix-bots/filestore/stargazers"><img src="https://img.shields.io/github/stars/codeflix-bots/filestore?color=black&logo=github&logoColor=black&style=for-the-badge" alt="Stars" /></a>
-<a href="https://github.com/codeflix-bots/filestore/network/members"> <img src="https://img.shields.io/github/forks/codeflix-bots/filestore?color=black&logo=github&logoColor=black&style=for-the-badge" /></a>
-<a href="https://github.com/codeflix-bots/filestore/blob/yato/LICENSE"> <img src="https://img.shields.io/badge/License-MIT-blueviolet?style=for-the-badge" alt="License" /> </a>
+<a href="https://github.com/tunebots/filestore/stargazers"><img src="https://img.shields.io/github/stars/tunebots/filestore?color=black&logo=github&logoColor=black&style=for-the-badge" alt="Stars" /></a>
+<a href="https://github.com/tunebots/filestore/network/members"> <img src="https://img.shields.io/github/forks/tunebots/filestore?color=black&logo=github&logoColor=black&style=for-the-badge" /></a>
+<a href="https://github.com/tunebots/filestore/blob/yato/LICENSE"> <img src="https://img.shields.io/badge/License-MIT-blueviolet?style=for-the-badge" alt="License" /> </a>
 <a href="https://www.python.org/"> <img src="https://img.shields.io/badge/Written%20in-Python-orange?style=for-the-badge&logo=python" alt="Python" /> </a>
-<a href="https://github.com/codeflix-bots/filestore/commits/Noob-Mukesh"> <img src="https://img.shields.io/github/last-commit/codeflix-bots/filestore?color=blue&logo=github&logoColor=green&style=for-the-badge" /></a>
+<a href="https://github.com/tunebots/filestore/commits/Noob-Mukesh"> <img src="https://img.shields.io/github/last-commit/tunebots/filestore?color=blue&logo=github&logoColor=green&style=for-the-badge" /></a>
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@
     ─「 ᴅᴇᴩʟᴏʏ ᴏɴ ʜᴇʀᴏᴋᴜ 」─
 </h3>
 
-<p align="center"><a href="https://dashboard.heroku.com/new?template=https://github.com/codeflix-bots/Filestore"> <img src="https://img.shields.io/badge/Deploy%20On%20Heroku-black?style=for-the-badge&logo=heroku" width="220" height="38.45"/></a></p>
+<p align="center"><a href="https://dashboard.heroku.com/new?template=https://github.com/tunebots/Filestore"> <img src="https://img.shields.io/badge/Deploy%20On%20Heroku-black?style=for-the-badge&logo=heroku" width="220" height="38.45"/></a></p>
 
 
 <h3 align="center">
@@ -141,8 +141,8 @@ MESSAGES = {
 - <b> ᴠᴘs/ʟᴏᴄᴀʟ ᴅᴇᴘʟᴏʏᴍᴇɴᴛ ᴍᴇᴛʜᴏᴅ </b>
 </h3></summary>
 
-- Get your [Necessary Variables](https://github.com/Codeflix-Bots/filestore/blob/yato/config.py)
-- git clone https://github.com/Codeflix-Bots/filestore
+- Get your [Necessary Variables](https://github.com/TuneBots/filestore/blob/yato/config.py)
+- git clone https://github.com/TuneBots/filestore
 - # Install Packages
 - pip3 install -U -r requirements.txt
 - Edit config.py with variables as given below then run bot
@@ -161,10 +161,10 @@ MESSAGES = {
 </h3>
 
 <p align="center">
-<a href="https://telegram.me/codeflixsupport"><img src="https://img.shields.io/badge/-Support%20Group-blue.svg?style=for-the-badge&logo=Telegram"></a>
+<a href="https://telegram.me/tunebotssupport"><img src="https://img.shields.io/badge/-Support%20Group-blue.svg?style=for-the-badge&logo=Telegram"></a>
 </p>
 <p align="center">
-<a href="https://telegram.me/codeflix_bots"><img src="https://img.shields.io/badge/-Support%20Channel-blue.svg?style=for-the-badge&logo=Telegram"></a>
+<a href="https://telegram.me/tunebots"><img src="https://img.shields.io/badge/-Support%20Channel-blue.svg?style=for-the-badge&logo=Telegram"></a>
 </p>
 
 ━━━━━━━━━━━━━━━━━━━━
@@ -173,8 +173,8 @@ MESSAGES = {
     ─「 ᴄʀᴇᴅɪᴛs 」─
 </h3>
 
-- <b>[ʏᴀᴛᴏ](https://github.com/Codeflix-Bots)  ➻  [sᴏᴍᴇᴛʜɪɴɢ](https://github.com/proyato) </b>
-- <b>[ᴠᴏᴀᴛ](https://github.com/Codeflix-Bots)  ➻  [ʙᴀsᴇ ʀᴇᴘᴏ](https://github.com/ArihantSharma/FileStoreBot) </b>
+- <b>[ʏᴀᴛᴏ](https://github.com/TuneBots)  ➻  [sᴏᴍᴇᴛʜɪɴɢ](https://github.com/proyato) </b>
+- <b>[ᴠᴏᴀᴛ](https://github.com/TuneBots)  ➻  [ʙᴀsᴇ ʀᴇᴘᴏ](https://github.com/ArihantSharma/FileStoreBot) </b>
 
 <h3 align="center">
 <b>🤝 ᴄᴏɴᴛʀɪʙᴜᴛɪɴɢ

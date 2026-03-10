@@ -1,4 +1,4 @@
-#(©)Codeflix Bots (ProYato)
+#(©)TuneBots (ProYato)
 
 from aiohttp import web
 from .route import routes

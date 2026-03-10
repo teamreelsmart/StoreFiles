@@ -12,6 +12,10 @@ MSG_EFFECT = 5046509860389126442
 SHORT_URL = "vplink.in" # shortner url 
 SHORT_API = "b4c55b5464676e8a7bbf9e8903b00a289debbec3" 
 SHORT_TUT = "https://t.me/HowToDownloadSnap/2"
+VERIFY_COOLDOWN = int(os.environ.get("VERIFY_COOLDOWN", "30"))
+VERIFY_REDIRECT_DELAY = int(os.environ.get("VERIFY_REDIRECT_DELAY", "5"))
+VERIFY_LOG_CHANNEL = int(os.environ.get("VERIFY_LOG_CHANNEL", "0"))
+SERVICE_URL = os.environ.get("SERVICE_URL", "")
 
 # Bot Configuration
 SESSION = "SnapXPagluBot"
@@ -49,6 +53,13 @@ MESSAGES = {
     "START_PHOTO": "https://graph.org/file/510affa3d4b6c911c12e3.jpg",
     "FSUB_PHOTO": "https://telegra.ph/file/7a16ef7abae23bd238c82-b8fbdcb05422d71974.jpg",
     "SHORT_PIC": "https://telegra.ph/file/7a16ef7abae23bd238c82-b8fbdcb05422d71974.jpg",
+    "VERIFY_WARN_PHOTO": "https://telegra.ph/file/7a16ef7abae23bd238c82-b8fbdcb05422d71974.jpg",
+    "VERIFY_WARN_MSG": "<b>⚠️ Verification bypass detected!\nPlease wait {seconds} seconds and use your new verify link.\nAttempt: {attempt}/2</b>",
+    "CHANNEL_LINK_PHOTO": "https://telegra.ph/file/7a16ef7abae23bd238c82-b8fbdcb05422d71974.jpg",
+    "CHANNEL_LINK_MSG": "<b>📢 Channel access link ready for <i>{channel_name}</i>.\n⏳ This join-request link will expire in {expire_minutes} minutes.\n👇 Tap button below to join.</b>",
+    "REFER_PHOTO": "https://telegra.ph/file/7a16ef7abae23bd238c82-b8fbdcb05422d71974.jpg",
+    "REFER_MSG": "<b>🎁 Refer & Earn Program!\nInvite your friends and after successful join, both of you get 1 day premium.</b>\n\n🔗 {invite_link}",
+    "DEFAULT_PROFILE_PIC": "https://telegra.ph/file/7a16ef7abae23bd238c82-b8fbdcb05422d71974.jpg",
     "SHORT": "https://telegra.ph/file/8aaf4df8c138c6685dcee-05d3b183d4978ec347.jpg"
 }
 
