@@ -1,7 +1,7 @@
 import requests
 import random
 import string
-from config import SHORT_URL, SHORT_API, MESSAGES
+from config import SHORT_URL, SHORT_API, SHORT_URL2, SHORT_API2, MESSAGES
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto
 from pyrogram.errors.pyromod import ListenerTimeout
@@ -14,32 +14,39 @@ def generate_random_alphanumeric():
     characters = string.ascii_letters + string.digits
     return ''.join(random.choice(characters) for _ in range(8))
 
-def get_short(url, client):
+def get_short(url, client, provider="primary"):
 
     # Check if shortner is enabled
     shortner_enabled = getattr(client, 'shortner_enabled', True)
-    verify_cooldown = int(getattr(client, 'verify_cooldown', 30))
     if not shortner_enabled:
         return url  # Return original URL if shortner is disabled
 
     # Step 2: Check cache
-    if url in shortened_urls_cache:
-        return shortened_urls_cache[url]
+    cache_key = f"{provider}:{url}"
+    if cache_key in shortened_urls_cache:
+        return shortened_urls_cache[cache_key]
 
     try:
         alias = generate_random_alphanumeric()
         # Use dynamic shortner settings from client if available
-        short_url = getattr(client, 'short_url', SHORT_URL)
-        short_api = getattr(client, 'short_api', SHORT_API)
+        if provider == "secondary":
+            short_url = getattr(client, 'short_url2', SHORT_URL2)
+            short_api = getattr(client, 'short_api2', SHORT_API2)
+        else:
+            short_url = getattr(client, 'short_url', SHORT_URL)
+            short_api = getattr(client, 'short_api', SHORT_API)
+
+        if not short_url or not short_api:
+            return url
         
         api_url = f"https://{short_url}/api?api={short_api}&url={url}&alias={alias}"
         response = requests.get(api_url)
         rjson = response.json()
 
         if rjson.get("status") == "success" and response.status_code == 200:
-            short_url = rjson.get("shortenedUrl", url)
-            shortened_urls_cache[url] = short_url
-            return short_url
+            short_link = rjson.get("shortenedUrl", url)
+            shortened_urls_cache[cache_key] = short_link
+            return short_link
     except Exception as e:
         print(f"[Shortener Error] {e}")
 
@@ -57,9 +64,12 @@ async def shortner_panel(client, query_or_message):
     # Get current shortner settings
     short_url = getattr(client, 'short_url', SHORT_URL)
     short_api = getattr(client, 'short_api', SHORT_API)
+    short_url2 = getattr(client, 'short_url2', SHORT_URL2)
+    short_api2 = getattr(client, 'short_api2', SHORT_API2)
     tutorial_link = getattr(client, 'tutorial_link', "https://t.me/HowToDownloadSnap/2")
     shortner_enabled = getattr(client, 'shortner_enabled', True)
     verify_cooldown = int(getattr(client, 'verify_cooldown', 30))
+    verify_access_hours = int(getattr(client, 'verify_access_hours', 4))
     
     # Check if shortner is working (only if enabled)
     if shortner_enabled:
@@ -77,18 +87,23 @@ async def shortner_panel(client, query_or_message):
     msg = f"""<blockquote>✦ 𝗦𝗛𝗢𝗥𝗧𝗡𝗘𝗥 𝗦𝗘𝗧𝗧𝗜𝗡𝗚𝗦</blockquote>
 **<u>ᴄᴜʀʀᴇɴᴛ ꜱᴇᴛᴛɪɴɢꜱ:</u>**
 <blockquote>›› **ꜱʜᴏʀᴛɴᴇʀ ꜱᴛᴀᴛᴜꜱ:** {enabled_text}
-›› **ꜱʜᴏʀᴛɴᴇʀ ᴜʀʟ:** `{short_url}`
-›› **ꜱʜᴏʀᴛɴᴇʀ ᴀᴘɪ:** `{short_api}`</blockquote> 
+›› **1sᴛ ꜱʜᴏʀᴛɴᴇʀ ᴜʀʟ:** `{short_url}`
+›› **1sᴛ ꜱʜᴏʀᴛɴᴇʀ ᴀᴘɪ:** `{short_api}`
+›› **2ɴᴅ ꜱʜᴏʀᴛɴᴇʀ ᴜʀʟ:** `{short_url2 or 'ɴᴏᴛ sᴇᴛ'}`
+›› **2ɴᴅ ꜱʜᴏʀᴛɴᴇʀ ᴀᴘɪ:** `{(short_api2[:20] + '...') if short_api2 else 'ɴᴏᴛ sᴇᴛ'}`</blockquote> 
 <blockquote>›› **ᴛᴜᴛᴏʀɪᴀʟ ʟɪɴᴋ:** `{tutorial_link}`
 ›› **ᴠᴇʀɪꜰʏ ᴛɪᴍᴇʀ (s):** `{verify_cooldown}`
+›› **ᴠᴇʀɪꜰʏ ᴀᴄᴄᴇss (h):** `{verify_access_hours}`
 ›› **ᴀᴘɪ ꜱᴛᴀᴛᴜꜱ:** {status}</blockquote>
 
 <blockquote>**≡ ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴄᴏɴꜰɪɢᴜʀᴇ ʏᴏᴜʀ ꜱʜᴏʀᴛɴᴇʀ ꜱᴇᴛᴛɪɴɢꜱ!**</blockquote>"""
     
     reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton(f'• {toggle_text} ꜱʜᴏʀᴛɴᴇʀ •', 'toggle_shortner'), InlineKeyboardButton('• ᴀᴅᴅ ꜱʜᴏʀᴛɴᴇʀ •', 'add_shortner')],
+        [InlineKeyboardButton(f'• {toggle_text} ꜱʜᴏʀᴛɴᴇʀ •', 'toggle_shortner'), InlineKeyboardButton('• ᴀᴅᴅ 1sᴛ ꜱʜᴏʀᴛɴᴇʀ •', 'add_shortner')],
+        [InlineKeyboardButton('• ᴀᴅᴅ 2ɴᴅ ꜱʜᴏʀᴛɴᴇʀ •', 'add_shortner2')],
         [InlineKeyboardButton('• ꜱᴇᴛ ᴛᴜᴛᴏʀɪᴀʟ ʟɪɴᴋ •', 'set_tutorial_link')],
         [InlineKeyboardButton('• ꜱᴇᴛ ᴠᴇʀɪꜰʏ ᴛɪᴍᴇʀ •', 'set_verify_cooldown')],
+        [InlineKeyboardButton('• ꜱᴇᴛ ᴠᴇʀɪꜰʏ ᴀᴄᴄᴇꜱꜱ ᴛɪᴍᴇ •', 'set_verify_access_hours')],
         [InlineKeyboardButton('• ᴛᴇꜱᴛ ꜱʜᴏʀᴛɴᴇʀ •', 'test_shortner')],
         [InlineKeyboardButton('◂ ʙᴀᴄᴋ ᴛᴏ ꜱᴇᴛᴛɪɴɢꜱ', 'settings')] if hasattr(query_or_message, 'message') else []
     ])
@@ -187,6 +202,52 @@ __<blockquote>**≡ ꜱᴇɴᴅ ɴᴇᴡ ꜱʜᴏʀᴛɴᴇʀ ᴜʀʟ ᴀɴᴅ �
         await query.message.edit_text("**⏰ ᴛɪᴍᴇᴏᴜᴛ! ᴛʀʏ ᴀɢᴀɪɴ.**", 
                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]]))
 
+
+@Client.on_callback_query(filters.regex("^add_shortner2$"))
+async def add_shortner2(client: Client, query: CallbackQuery):
+    if not query.from_user.id in client.admins:
+        return await query.answer('❌ ᴏɴʟʏ ᴀᴅᴍɪɴꜱ ᴄᴀɴ ᴜꜱᴇ ᴛʜɪꜱ!', show_alert=True)
+
+    await query.answer()
+
+    current_url = getattr(client, 'short_url2', SHORT_URL2) or 'ɴᴏᴛ sᴇᴛ'
+    current_api = getattr(client, 'short_api2', SHORT_API2) or 'ɴᴏᴛ sᴇᴛ'
+
+    msg = f"""<blockquote>**ꜱᴇᴛ 2ɴᴅ ꜱʜᴏʀᴛɴᴇʀ ꜱᴇᴛᴛɪɴɢꜱ:**</blockquote>
+**ᴄᴜʀʀᴇɴᴛ 2ɴᴅ ꜱᴇᴛᴛɪɴɢꜱ:**
+• **ᴜʀʟ:** `{current_url}`
+• **ᴀᴘɪ:** `{current_api[:20] + '...' if current_api != 'ɴᴏᴛ sᴇᴛ' else current_api}`
+
+__<blockquote>**≡ ꜱᴇɴᴅ ɴᴇᴡ 2ɴᴅ ꜱʜᴏʀᴛɴᴇʀ ᴜʀʟ ᴀɴᴅ ᴀᴘɪ ɪɴ ᴛʜɪꜱ ꜰᴏʀᴍᴀᴛ!**</blockquote>__
+
+**ꜰᴏʀᴍᴀᴛ:** `ᴜʀʟ ᴀᴘɪ`
+**ᴇxᴀᴍᴘʟᴇ:** `inshorturl.com 9435894656863495834957348`"""
+
+    await query.message.edit_text(msg)
+    try:
+        res = await client.listen(user_id=query.from_user.id, filters=filters.text, timeout=60)
+        response_text = res.text.strip()
+        parts = response_text.split()
+        if len(parts) >= 2:
+            new_url = parts[0].replace('https://', '').replace('http://', '').replace('/', '')
+            new_api = ' '.join(parts[1:])
+
+            if new_url and '.' in new_url and new_api and len(new_api) > 10:
+                client.short_url2 = new_url
+                client.short_api2 = new_api
+                await client.mongodb.update_shortner_setting('short_url2', new_url)
+                await client.mongodb.update_shortner_setting('short_api2', new_api)
+                await query.message.edit_text(
+                    f"**✓ 2ɴᴅ ꜱʜᴏʀᴛɴᴇʀ ᴜᴘᴅᴀᴛᴇᴅ!**\n\n**ɴᴇᴡ ᴜʀʟ:** `{new_url}`\n**ɴᴇᴡ ᴀᴘɪ:** `{new_api[:20]}...`",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]])
+                )
+            else:
+                await query.message.edit_text("**✗ ɪɴᴠᴀʟɪᴅ ꜰᴏʀᴍᴀᴛ!**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]]))
+        else:
+            await query.message.edit_text("**✗ ɪɴᴠᴀʟɪᴅ ꜰᴏʀᴍᴀᴛ! ᴜꜱᴇ: `ᴜʀʟ ᴀᴘɪ`**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]]))
+    except ListenerTimeout:
+        await query.message.edit_text("**⏰ ᴛɪᴍᴇᴏᴜᴛ! ᴛʀʏ ᴀɢᴀɪɴ.**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]]))
+
 #===============================================================#
 
 @Client.on_callback_query(filters.regex("^set_tutorial_link$"))
@@ -259,6 +320,38 @@ async def set_verify_cooldown(client: Client, query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]])
         )
 
+
+@Client.on_callback_query(filters.regex("^set_verify_access_hours$"))
+async def set_verify_access_hours(client: Client, query: CallbackQuery):
+    if not query.from_user.id in client.admins:
+        return await query.answer('❌ ᴏɴʟʏ ᴀᴅᴍɪɴꜱ ᴄᴀɴ ᴜꜱᴇ ᴛʜɪꜱ!', show_alert=True)
+
+    await query.answer()
+    current = int(getattr(client, 'verify_access_hours', 4))
+    await query.message.edit_text(
+        f"**Select verification access duration.\nCurrent:** `{current}h`",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton('4h', 'verify_access_4'), InlineKeyboardButton('8h', 'verify_access_8')],
+            [InlineKeyboardButton('12h', 'verify_access_12'), InlineKeyboardButton('24h', 'verify_access_24')],
+            [InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]
+        ])
+    )
+
+
+@Client.on_callback_query(filters.regex(r"^verify_access_(4|8|12|24)$"))
+async def save_verify_access_hours(client: Client, query: CallbackQuery):
+    if not query.from_user.id in client.admins:
+        return await query.answer('❌ ᴏɴʟʏ ᴀᴅᴍɪɴꜱ ᴄᴀɴ ᴜꜱᴇ ᴛʜɪꜱ!', show_alert=True)
+
+    hours = int(query.data.rsplit('_', 1)[1])
+    client.verify_access_hours = hours
+    await client.mongodb.update_shortner_setting('verify_access_hours', hours)
+    await query.answer(f"Saved {hours}h", show_alert=False)
+    await query.message.edit_text(
+        f"**✅ Verification access time set to `{hours}h`.**",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]])
+    )
+
 @Client.on_callback_query(filters.regex("^test_shortner$"))
 async def test_shortner(client: Client, query: CallbackQuery):
     if not query.from_user.id in client.admins:
@@ -296,6 +389,3 @@ async def test_shortner(client: Client, query: CallbackQuery):
         msg = f"**❌ ꜱʜᴏʀᴛɴᴇʀ ᴛᴇꜱᴛ ꜰᴀɪʟᴇᴅ!**\n\n**ᴇʀʀᴏʀ:** `{str(e)}`"
     
     await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'shortner')]]))
-
-
-
